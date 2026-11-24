@@ -44,6 +44,22 @@ namespace FreshCatch.Data
             return def;
         }
 
+        /// <summary>Overwrites this asset with a definition (used by the editor's import and generator).</summary>
+        public void CopyFrom(LevelDefinition def)
+        {
+            stallSlots = def.StallSlots;
+            visibleCustomers = def.VisibleCustomers;
+            maxRottenFish = def.MaxRottenFish;
+            freshnessMode = def.FreshnessMode;
+            freshnessSeconds = def.FreshnessSeconds;
+            freshnessMoves = def.FreshnessMoves;
+            autoServe = def.AutoServe;
+            boats = new List<FishGroup>();
+            foreach (var b in def.Boats) boats.Add(new FishGroup { fish = new List<FishType>(b) });
+            customers = new List<FishGroup>();
+            foreach (var c in def.Customers) customers.Add(new FishGroup { fish = new List<FishType>(c) });
+        }
+
         private void OnValidate()
         {
             foreach (var e in ToDefinition().Validate())

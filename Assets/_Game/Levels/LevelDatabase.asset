@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abc885b179c85cd4892362382704d6e1, type: 3}
+  m_Name: LevelDatabase
+  m_EditorClassIdentifier: FreshCatch.Runtime::FreshCatch.Data.LevelDatabase
+  levels:
+  - {fileID: 11400000, guid: 18603ac0452d94a44a1b6cd1f30d2a16, type: 2}
+  - {fileID: 11400000, guid: 8920c238d67638c4c80b5c08371c6cd2, type: 2}
+  - {fileID: 11400000, guid: 7389e7762f7022a4d84acac43eaa8a48, type: 2}
+  - {fileID: 11400000, guid: 2818d48dd5a53fb439951a3d9ea01376, type: 2}
+  - {fileID: 11400000, guid: df58f33d679a88c408f1236afbf3badd, type: 2}
+  - {fileID: 11400000, guid: 72add5c42951a9f479ae7e454d122c3f, type: 2}

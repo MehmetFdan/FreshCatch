@@ -32,6 +32,8 @@ namespace FreshCatch.Model
 
         public int BoatsRemaining => _boatQueue.Count;
         public IEnumerable<FishType> NextBoatPreview => _boatQueue.Count > 0 ? _boatQueue.Peek() : null;
+        /// <summary>Customers still waiting in line (not yet visible), in arrival order.</summary>
+        public IEnumerable<IReadOnlyList<FishType>> UpcomingCustomers => _customerQueue;
 
         // ---- Events (views listen to these) ----
         public event Action<Fish, int> FishMovedToStall;          // fish, slot

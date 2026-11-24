@@ -59,7 +59,7 @@ namespace FreshCatch.Model
             // 6: only two customers visible -> stall management matters
             new LevelDefinition
             {
-                StallSlots = 6, VisibleCustomers = 2, MaxRottenFish = 1, FreshnessMoves = 8,
+                StallSlots = 6, VisibleCustomers = 2, MaxRottenFish = 1, FreshnessMoves = 14,
                 Boats = { L(Hamsi, Hamsi, Levrek, Levrek, Cipura, Cipura), L(Lufer, Lufer, Palamut, Palamut, Hamsi, Levrek), L(Cipura, Lufer, Palamut, Hamsi) },
                 Customers = { L(Hamsi, Levrek, Cipura), L(Lufer, Palamut), L(Hamsi, Hamsi, Hamsi), L(Levrek, Levrek), L(Cipura, Cipura), L(Lufer, Lufer, Palamut, Palamut) }
             },
