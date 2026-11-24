@@ -1,0 +1,17 @@
+{
+    "name": "FreshCatch.Runtime",
+    "rootNamespace": "FreshCatch",
+    "references": [
+        "FreshCatch.Model",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
