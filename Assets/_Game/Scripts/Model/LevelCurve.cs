@@ -80,34 +80,147 @@ namespace FreshCatch.Model
 
                 var t = (n - TutorialLevels - 1f) / Math.Max(1f, total - TutorialLevels - 1f);
                 var (shape, gen) = Knobs(t, n);
-
-                LevelDefinition best = null;
-                var bestSeed = -1;
-                var bestDist = float.MaxValue;
-                for (var i = 0; i < seedsPerLevel; i++)
-                {
-                    gen.Seed = n * 1000 + i;
-                    var candidate = Clone(shape);
-                    LevelGenerator.Generate(gen, candidate);
-                    if (!LevelSolver.Play(candidate, null, 0f).Won) continue;
-
-                    var rate = LevelSolver.Analyze(candidate, searchPlayouts, 0.3f, gen.Seed).WinRate;
-                    var dist = Math.Abs(rate - target);
-                    if (dist >= bestDist) continue;
-                    bestDist = dist;
-                    best = candidate;
-                    bestSeed = gen.Seed;
-                    if (dist < 0.03f) break;
-                }
-
-                if (best == null) throw new InvalidOperationException($"Level {n}: no winnable seed in {seedsPerLevel} tries.");
-                result.Add(new CurveLevel
-                {
-                    Number = n, Level = best, Seed = bestSeed, TargetWinRate = target,
-                    Analysis = LevelSolver.Analyze(best, finalPlayouts)
-                });
+                result.Add(Search(n, shape, gen, target, seedsPerLevel, searchPlayouts, finalPlayouts));
             }
             return result;
+        }
+
+        // ------------------------------------------------------------------ chapters (21+)
+
+        public const int ChapterSize = 10;
+
+        /// <summary>
+        /// Late-game target: a sawtooth per 10-level chapter (breather → ramp → boss on the 10th),
+        /// drifting slightly harder each chapter.
+        /// </summary>
+        public static float ChapterTargetWinRate(int number)
+        {
+            var chapter = (number - 1) / ChapterSize;          // level 21 -> chapter 2
+            var pos = (number - 1) % ChapterSize;              // 0..9
+            var drift = Math.Min(0.10f, (chapter - 2) * 0.012f);
+            float target;
+            if (pos == 0) target = 0.78f;                      // breather
+            else if (pos == ChapterSize - 1) target = 0.33f;   // boss
+            else target = 0.70f - (pos - 1) * 0.035f;          // 0.70 → 0.455
+            if (pos == 4) target += 0.08f;                     // mid-chapter rest
+            return Math.Max(0.25f, Math.Min(0.9f, target - drift));
+        }
+
+        /// <summary>
+        /// Late-game shape. Each chapter has a theme so levels feel different, not just harder:
+        /// 0 = tight stall, 1 = many types, 2 = big orders, 3 = fast rot, 4 = long queues.
+        /// </summary>
+        public static (LevelDefinition shape, GeneratorSettings gen) ChapterKnobs(int number)
+        {
+            var chapter = (number - 1) / ChapterSize;
+            var pos = (number - 1) % ChapterSize;
+            var theme = (chapter - 2) % 5;
+            var p = pos / (ChapterSize - 1f);                  // 0..1 inside the chapter
+            int Lerp(int a, int b) => (int)Math.Round(a + (b - a) * p);
+
+            var shape = new LevelDefinition
+            {
+                StallSlots = 6,
+                VisibleCustomers = 3,
+                MaxRottenFish = 1,
+                FreshnessMode = FreshnessMode.MoveBased,
+                FreshnessMoves = Lerp(11, 9),
+            };
+            var gen = new GeneratorSettings
+            {
+                FishTypes = 4,
+                Customers = Lerp(7, 11),
+                MinOrder = 2,
+                MaxOrder = 4,
+                BoatSize = 5,
+                ExtraFish = pos >= 6 ? 1 : 0,
+                Scramble = Lerp(5, 9),
+                Seed = number * 1000
+            };
+
+            switch (theme)
+            {
+                case 0: // tight stall
+                    shape.StallSlots = Lerp(5, 4);
+                    shape.VisibleCustomers = 2;
+                    gen.FishTypes = 3;
+                    gen.MaxOrder = 3;
+                    break;
+                case 1: // many types
+                    gen.FishTypes = 5;
+                    shape.StallSlots = 6;
+                    gen.BoatSize = 6;
+                    break;
+                case 2: // big orders
+                    gen.MinOrder = 3;
+                    gen.MaxOrder = 5;
+                    gen.Customers = Lerp(6, 9);
+                    shape.StallSlots = 6;
+                    shape.FreshnessMoves = Lerp(10, 9);
+                    break;
+                case 3: // fast rot
+                    shape.FreshnessMoves = Lerp(9, 6);
+                    shape.MaxRottenFish = 2;
+                    gen.ExtraFish = Lerp(1, 3);
+                    break;
+                default: // long queues
+                    gen.Customers = Lerp(10, 15);
+                    shape.VisibleCustomers = 2;
+                    gen.BoatSize = 6;
+                    break;
+            }
+
+            if (pos == 0) // breather: a bit more room
+            {
+                shape.StallSlots += 1;
+                shape.FreshnessMoves += 2;
+            }
+            return (shape, gen);
+        }
+
+        /// <summary>Generates levels <paramref name="from"/>..<paramref name="to"/> (inclusive) with the chapter curve.</summary>
+        public static List<CurveLevel> BuildChapters(int from, int to, int seedsPerLevel = 150, int searchPlayouts = 80, int finalPlayouts = 200,
+            Action<int, int> progress = null)
+        {
+            var result = new List<CurveLevel>();
+            for (var n = from; n <= to; n++)
+            {
+                progress?.Invoke(n - from + 1, to - from + 1);
+                var (shape, gen) = ChapterKnobs(n);
+                result.Add(Search(n, shape, gen, ChapterTargetWinRate(n), seedsPerLevel, searchPlayouts, finalPlayouts));
+            }
+            return result;
+        }
+
+        /// <summary>Tries seeds and keeps the winnable level whose noisy win rate is closest to the target.</summary>
+        private static CurveLevel Search(int n, LevelDefinition shape, GeneratorSettings gen, float target,
+            int seedsPerLevel, int searchPlayouts, int finalPlayouts)
+        {
+            LevelDefinition best = null;
+            var bestSeed = -1;
+            var bestDist = float.MaxValue;
+            for (var i = 0; i < seedsPerLevel; i++)
+            {
+                gen.Seed = n * 1000 + i;
+                var candidate = Clone(shape);
+                LevelGenerator.Generate(gen, candidate);
+                if (!LevelSolver.Play(candidate, null, 0f).Won) continue;
+
+                var rate = LevelSolver.Analyze(candidate, searchPlayouts, 0.3f, gen.Seed).WinRate;
+                var dist = Math.Abs(rate - target);
+                if (dist >= bestDist) continue;
+                bestDist = dist;
+                best = candidate;
+                bestSeed = gen.Seed;
+                if (dist < 0.03f) break;
+            }
+
+            if (best == null) throw new InvalidOperationException($"Level {n}: no winnable seed in {seedsPerLevel} tries.");
+            return new CurveLevel
+            {
+                Number = n, Level = best, Seed = bestSeed, TargetWinRate = target,
+                Analysis = LevelSolver.Analyze(best, finalPlayouts)
+            };
         }
 
         private static LevelDefinition Clone(LevelDefinition s) => new LevelDefinition
