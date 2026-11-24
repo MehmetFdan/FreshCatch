@@ -3,6 +3,7 @@
     "rootNamespace": "FreshCatch.Tests",
     "references": [
         "FreshCatch.Model",
+        "FreshCatch.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

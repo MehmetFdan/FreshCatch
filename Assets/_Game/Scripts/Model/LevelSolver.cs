@@ -39,14 +39,15 @@ namespace FreshCatch.Model
     {
         public const int MaxMoves = 2000;
 
-        public static LevelAnalysis Analyze(LevelDefinition level, int playouts = 200, float epsilon = 0.3f, int seed = 12345, float secondsPerMove = 1f)
+        public static LevelAnalysis Analyze(LevelDefinition level, int playouts = 200, float epsilon = 0.3f, int seed = 12345,
+            float secondsPerMove = 1f, bool knowsFuture = false)
         {
-            var a = new LevelAnalysis { Greedy = Play(level, null, 0f, secondsPerMove), Playouts = playouts };
+            var a = new LevelAnalysis { Greedy = Play(level, null, 0f, secondsPerMove, knowsFuture), Playouts = playouts };
             var rng = new Random(seed);
             long winMoves = 0;
             for (var i = 0; i < playouts; i++)
             {
-                var r = Play(level, rng, epsilon, secondsPerMove);
+                var r = Play(level, rng, epsilon, secondsPerMove, knowsFuture);
                 if (r.Won) { a.Wins++; winMoves += r.Moves; }
                 else a.Losses[r.Reason] = a.Losses.TryGetValue(r.Reason, out var n) ? n + 1 : 1;
             }
@@ -54,14 +55,18 @@ namespace FreshCatch.Model
             return a;
         }
 
-        /// <summary>Plays one game. rng == null means fully greedy.</summary>
-        public static PlayResult Play(LevelDefinition level, Random rng, float epsilon, float secondsPerMove = 1f)
+        /// <summary>
+        /// Plays one game. rng == null means fully greedy.
+        /// knowsFuture = false (default) limits the player to what is on screen: the visible customers,
+        /// the docked boat and the stall. true also lets it read the hidden customer queue (cheating).
+        /// </summary>
+        public static PlayResult Play(LevelDefinition level, Random rng, float epsilon, float secondsPerMove = 1f, bool knowsFuture = false)
         {
             var b = new BoardState(level);
             b.Start();
             while (b.Result == GameResult.Playing && b.MoveCount < MaxMoves)
             {
-                var moved = rng != null && rng.NextDouble() < epsilon ? RandomMove(b, rng) : GreedyMove(b);
+                var moved = rng != null && rng.NextDouble() < epsilon ? RandomMove(b, rng) : GreedyMove(b, knowsFuture);
                 if (!moved) break;
                 if (level.FreshnessMode == FreshnessMode.TimeBased) b.Tick(secondsPerMove);
             }
@@ -76,7 +81,7 @@ namespace FreshCatch.Model
             };
         }
 
-        public static bool GreedyMove(BoardState b)
+        public static bool GreedyMove(BoardState b, bool knowsFuture = false)
         {
             // 1) Serve from the stall, most faded fish first.
             var bestSlot = -1;
@@ -99,11 +104,14 @@ namespace FreshCatch.Model
                 if (!f.IsRotten) onStall[f.Type] = onStall.TryGetValue(f.Type, out var n) ? n + 1 : 1;
 
             var firstUpcoming = new Dictionary<FishType, int>();
-            var idx = 0;
-            foreach (var order in b.UpcomingCustomers)
+            if (knowsFuture)
             {
-                foreach (var t in order) if (!firstUpcoming.ContainsKey(t)) firstUpcoming[t] = idx;
-                idx++;
+                var idx = 0;
+                foreach (var order in b.UpcomingCustomers)
+                {
+                    foreach (var t in order) if (!firstUpcoming.ContainsKey(t)) firstUpcoming[t] = idx;
+                    idx++;
+                }
             }
 
             var bestIndex = -1;
@@ -116,8 +124,9 @@ namespace FreshCatch.Model
                 onStall.TryGetValue(t, out var have);
                 int score;
                 if (need > have) score = 1000;
-                else if (firstUpcoming.TryGetValue(t, out var when)) score = 500 - when * 10;
-                else score = 0;
+                else if (knowsFuture && firstUpcoming.TryGetValue(t, out var when)) score = 500 - when * 10;
+                // Blind guess: avoid stockpiling a type the stall already holds.
+                else score = 100 - have * 10;
                 if (score > bestScore) { bestScore = score; bestIndex = i; }
             }
             return bestIndex >= 0 && b.TapBoatFish(bestIndex);
