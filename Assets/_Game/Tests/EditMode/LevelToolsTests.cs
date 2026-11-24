@@ -74,6 +74,19 @@ namespace FreshCatch.Tests
         }
 
         [Test]
+        public void Curve_LevelsAreValidWinnableAndGetHarder()
+        {
+            var curve = LevelCurve.Build(10, seedsPerLevel: 40, searchPlayouts: 40, finalPlayouts: 80);
+            Assert.AreEqual(10, curve.Count);
+            foreach (var c in curve)
+            {
+                CollectionAssert.IsEmpty(c.Level.Validate(), $"Level {c.Number}");
+                Assert.IsTrue(c.Analysis.Greedy.Won, $"Level {c.Number} not winnable by greedy");
+            }
+            Assert.Less(curve[9].Analysis.WinRate, curve[0].Analysis.WinRate, "Last level should be harder than the first.");
+        }
+
+        [Test]
         public void GenerateSolvable_ReturnsLevelGreedyCanWin()
         {
             var s = new GeneratorSettings { FishTypes = 3, Customers = 5, Seed = 10 };
